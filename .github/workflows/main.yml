@@ -1,0 +1,62 @@
+name: Build WIPI Emulator ARM32
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-arm32:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: armv7-linux-androideabi
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;35.0.0" "ndk;27.0.12077973"
+
+      - name: Setup Android NDK environment
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> $GITHUB_ENV
+          echo "$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> $GITHUB_PATH
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Build WIPI ARM32 native library
+        run: |
+          cargo ndk \
+            -t armeabi-v7a \
+            -o android/app/src/main/jniLibs \
+            build \
+            --release \
+            -p wipi_android
+
+      - name: Change Android ABI to ARM32
+        run: |
+          sed -i 's/listOf("arm64-v8a", "x86_64")/listOf("armeabi-v7a")/' \
+            android/app/build.gradle.kts
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Upload ARM32 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WIPI-Emulator-ARM32
+          path: android/app/build/outputs/apk/release/*.apk
