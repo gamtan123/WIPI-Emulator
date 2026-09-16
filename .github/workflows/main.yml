@@ -77,7 +77,7 @@ jobs:
           echo "Checking AAudio library..."
 
           find "$NDK" -type f \
-            -name "libaaudio.so" -o -name "libaaudio.a" \
+            \( -name "libaaudio.so" -o -name "libaaudio.a" \) \
             -print
 
 
@@ -109,4 +109,60 @@ jobs:
 
 
       # 12. ARM32 라이브러리 생성 확인
-      -
+      - name: Verify ARM32 native library
+        run: |
+          echo "=== Generated native libraries ==="
+
+          find android/app/src/main/jniLibs \
+            -type f \
+            -print
+
+
+      # 13. Android ABI를 ARM32로 변경
+      - name: Change Android ABI to ARM32
+        run: |
+          sed -i \
+            's/listOf("arm64-v8a", "x86_64")/listOf("armeabi-v7a")/' \
+            android/app/build.gradle.kts
+
+
+      # 14. ABI 설정 확인
+      - name: Verify Android ABI configuration
+        run: |
+          echo "=== ABI configuration ==="
+
+          grep -n "abiFilters" \
+            android/app/build.gradle.kts || true
+
+          grep -n "armeabi-v7a" \
+            android/app/build.gradle.kts || true
+
+
+      # 15. Gradle 실행 권한 부여
+      - name: Make Gradle executable
+        run: |
+          chmod +x android/gradlew
+
+
+      # 16. ARM32 APK 빌드
+      - name: Build APK
+        working-directory: android
+        run: |
+          ./gradlew assembleRelease --stacktrace
+
+
+      # 17. APK 생성 확인
+      - name: Verify APK
+        run: |
+          echo "=== Generated APK ==="
+
+          ls -lh \
+            android/app/build/outputs/apk/release/*.apk
+
+
+      # 18. ARM32 APK 업로드
+      - name: Upload ARM32 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WIPI-Emulator-ARM32
+          path: android/app/build/outputs/apk/release/*.apk
