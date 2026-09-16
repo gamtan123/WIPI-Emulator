@@ -26,6 +26,12 @@ jobs:
         run: |
           rustup target add armv7-linux-androideabi
 
+      - name: Verify Rust ARM32 target
+        run: |
+          rustup target list --installed
+          rustc --version
+          cargo --version
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
@@ -37,20 +43,23 @@ jobs:
           sdkmanager "platform-tools" \
             "platforms;android-36" \
             "build-tools;35.0.0" \
-            "ndk;27.0.12077973"
+            "ndk;27.3.13750724"
 
       - name: Setup Android NDK environment
         run: |
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> $GITHUB_ENV
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.3.13750724" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.3.13750724" >> $GITHUB_ENV
+
+      - name: Verify Android NDK
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          echo "ANDROID_NDK_ROOT=$ANDROID_NDK_ROOT"
+          ls -la "$ANDROID_SDK_ROOT/ndk/27.3.13750724"
 
       - name: Install cargo-ndk
-        run: cargo install cargo-ndk
-
-      - name: Verify Rust ARM32 target
         run: |
-          rustup target list --installed
-          rustc --version
-          cargo --version
+          cargo install cargo-ndk
 
       - name: Build WIPI ARM32 native library
         working-directory: rust
@@ -62,17 +71,32 @@ jobs:
             --release \
             -p wipi_android
 
+      - name: Verify ARM32 native library
+        run: |
+          find android/app/src/main/jniLibs -type f -print
+
       - name: Change Android ABI to ARM32
         run: |
           sed -i 's/listOf("arm64-v8a", "x86_64")/listOf("armeabi-v7a")/' \
             android/app/build.gradle.kts
 
+      - name: Verify Android ABI configuration
+        run: |
+          grep -n "abiFilters" android/app/build.gradle.kts || true
+          grep -n "armeabi-v7a" android/app/build.gradle.kts || true
+
       - name: Make Gradle executable
-        run: chmod +x android/gradlew
+        run: |
+          chmod +x android/gradlew
 
       - name: Build APK
         working-directory: android
-        run: ./gradlew assembleRelease
+        run: |
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Verify APK
+        run: |
+          ls -lh android/app/build/outputs/apk/release/*.apk
 
       - name: Upload ARM32 APK
         uses: actions/upload-artifact@v4
