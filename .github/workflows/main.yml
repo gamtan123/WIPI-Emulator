@@ -9,16 +9,12 @@ jobs:
 
     steps:
 
-      # ============================================================
-      # 1. 소스 가져오기
-      # ============================================================
+      # 1. 소스 다운로드
       - name: Checkout
         uses: actions/checkout@v4
 
 
-      # ============================================================
       # 2. Java 17
-      # ============================================================
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -26,35 +22,28 @@ jobs:
           java-version: '17'
 
 
-      # ============================================================
       # 3. Rust
-      # ============================================================
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: armv7-linux-androideabi
 
 
-      # ============================================================
       # 4. ARM32 Rust target 확인
-      # ============================================================
       - name: Install Rust ARM32 target
         run: |
           rustup target add armv7-linux-androideabi
+          rustup target list --installed
 
 
-      # ============================================================
       # 5. Android SDK
-      # ============================================================
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: ''
 
 
-      # ============================================================
-      # 6. Android SDK / NDK
-      # ============================================================
+      # 6. Android SDK / Build Tools / NDK 설치
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses || true
@@ -66,9 +55,7 @@ jobs:
             "ndk;27.3.13750724"
 
 
-      # ============================================================
-      # 7. NDK 환경 설정
-      # ============================================================
+      # 7. Android NDK 설정
       - name: Setup Android NDK
         run: |
           NDK="$ANDROID_SDK_ROOT/ndk/27.3.13750724"
@@ -76,152 +63,8 @@ jobs:
           echo "ANDROID_NDK_HOME=$NDK" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$NDK" >> "$GITHUB_ENV"
 
-          echo "======================================"
-          echo "Android NDK:"
-          echo "$NDK"
-          echo "======================================"
+          echo "ANDROID_NDK_HOME=$NDK"
+          echo "ANDROID_NDK_ROOT=$NDK"
 
           ls -la "$NDK"
-
-          echo "======================================"
-          echo "LLVM:"
-          echo "======================================"
-
-          ls -la \
-            "$NDK/toolchains/llvm/prebuilt/linux-x86_64"
-
-
-      # ============================================================
-      # 8. ARM32 AAudio 라이브러리 찾기
-      # ============================================================
-      - name: Check ARM32 AAudio library
-        run: |
-          NDK="$ANDROID_SDK_ROOT/ndk/27.3.13750724"
-
-          echo "======================================"
-          echo "Searching for ARM32 libaaudio"
-          echo "======================================"
-
-          find "$NDK" \
-            -type f \
-            \( -name "libaaudio.so" -o -name "libaaudio.a" \) \
-            -print
-
-
-      # ============================================================
-      # 9. cargo-ndk 최신 버전 설치
-      # ============================================================
-      - name: Install cargo-ndk
-        run: |
-          cargo install --force cargo-ndk
-
-          echo "======================================"
-          echo "cargo-ndk version"
-          echo "======================================"
-
-          cargo ndk --version
-
-
-      # ============================================================
-      # 10. cargo-ndk 환경 확인
-      # ============================================================
-      - name: Verify cargo-ndk environment
-        working-directory: rust
-        run: |
-          cargo ndk-env -t armeabi-v7a
-
-
-      # ============================================================
-      # 11. WIPI ARM32 네이티브 라이브러리 빌드
-      # ============================================================
-      - name: Build WIPI ARM32 native library
-        working-directory: rust
-        run: |
-          cargo ndk \
-            -t armeabi-v7a \
-            --platform 26 \
-            -o ../android/app/src/main/jniLibs \
-            build \
-            --release \
-            -p wipi_android
-
-
-      # ============================================================
-      # 12. 생성된 ARM32 라이브러리 확인
-      # ============================================================
-      - name: Verify ARM32 native library
-        run: |
-          echo "======================================"
-          echo "Generated native libraries"
-          echo "======================================"
-
-          find \
-            android/app/src/main/jniLibs \
-            -type f \
-            -print
-
-
-      # ============================================================
-      # 13. Android ABI를 ARM32로 변경
-      # ============================================================
-      - name: Change Android ABI to ARM32
-        run: |
-          sed -i \
-            's/listOf("arm64-v8a", "x86_64")/listOf("armeabi-v7a")/' \
-            android/app/build.gradle.kts
-
-
-      # ============================================================
-      # 14. ABI 설정 확인
-      # ============================================================
-      - name: Verify Android ABI configuration
-        run: |
-          echo "======================================"
-          echo "ABI configuration"
-          echo "======================================"
-
-          grep -n "abiFilters" \
-            android/app/build.gradle.kts || true
-
-          grep -n "armeabi-v7a" \
-            android/app/build.gradle.kts || true
-
-
-      # ============================================================
-      # 15. Gradle 실행 권한
-      # ============================================================
-      - name: Make Gradle executable
-        run: |
-          chmod +x android/gradlew
-
-
-      # ============================================================
-      # 16. APK 빌드
-      # ============================================================
-      - name: Build APK
-        working-directory: android
-        run: |
-          ./gradlew assembleRelease --stacktrace
-
-
-      # ============================================================
-      # 17. APK 확인
-      # ============================================================
-      - name: Verify APK
-        run: |
-          echo "======================================"
-          echo "Generated APK"
-          echo "======================================"
-
-          ls -lh \
-            android/app/build/outputs/apk/release/*.apk
-
-
-      # ============================================================
-      # 18. ARM32 APK 업로드
-      # ============================================================
-      - name: Upload ARM32 APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: WIPI-Emulator-ARM32
-          path: android/app/build/outputs/apk/release/*.apk
+          ls -
